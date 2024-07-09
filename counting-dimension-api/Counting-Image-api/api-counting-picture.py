@@ -14,7 +14,7 @@ model = YOLO("yolov8x.pt")
 # In-memory storage for detection results
 detection_storage = {}
 
-@app.post("/detect/")
+@app.post("/detection/detect/")
 async def detect(file: UploadFile = File(...)):
     # Read the image file
     contents = await file.read()
@@ -39,7 +39,7 @@ async def detect(file: UploadFile = File(...)):
     # Return the list of detected classes
     return JSONResponse(content={"detection_id": detection_id, "detected_classes": list(detected_classes)})
 
-@app.post("/annotate/")
+@app.post("/detection/annotate/")
 async def annotate(detection_id: int = Form(...), classes: str = Form(...)):
     if detection_id not in detection_storage:
         raise HTTPException(status_code=404, detail="Detection ID not found")

@@ -23,7 +23,7 @@ DEVICE = torch.device(
 intermediate_image_base64 = None  # Global variable to store intermediate image
 everything_results = None  # Global variable to store results
 
-@app.post("/upload_image/")
+@app.post("dimension/upload_image/")
 async def upload_image(
     file: UploadFile = File(...),
     confidence_threshold: float = Form(0.6)
@@ -68,7 +68,7 @@ async def upload_image(
     # Return the base64 image in JSON response
     return JSONResponse(content={"image": intermediate_image_base64})
 
-@app.post("/process_image/")
+@app.post("dimension/process_image/")
 async def process_image(
     reference_height: float = Form(...),
     reference_width: float = Form(...),
