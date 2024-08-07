@@ -23,7 +23,7 @@ DEVICE = torch.device(
 intermediate_image_base64 = None  # Global variable to store intermediate image
 everything_results = None  # Global variable to store results
 
-@app.post("dimension/upload_image/")
+@app.post("/dimension/upload_image/")
 async def upload_image(
     file: UploadFile = File(...),
     confidence_threshold: float = Form(0.6)
@@ -58,7 +58,7 @@ async def upload_image(
             box_points = cv2.boxPoints(rect)
             box_points = np.intp(box_points)
             cv2.drawContours(frame, [box_points], 0, (0, 255, 0), 2)
-            cv2.putText(frame, f'ID: {i}', (int(box[0]), int(box[1]) - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            cv2.putText(frame, f'ID: {i}', (int(box[0]), int(box[1]) - 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 3)
 
     # Encode the image as base64
     retval, buffer = cv2.imencode('.jpg', frame)
@@ -68,7 +68,7 @@ async def upload_image(
     # Return the base64 image in JSON response
     return JSONResponse(content={"image": intermediate_image_base64})
 
-@app.post("dimension/process_image/")
+@app.post("/dimension/process_image/")
 async def process_image(
     reference_height: float = Form(...),
     reference_width: float = Form(...),
@@ -77,19 +77,15 @@ async def process_image(
     global everything_results, intermediate_image_base64
     frame = cv2.imdecode(np.frombuffer(base64.b64decode(intermediate_image_base64), np.uint8), cv2.IMREAD_COLOR)
 
+    # Determine the conversion factors using the reference box
     reference_object_height_real_world = reference_height
     reference_object_width_real_world = reference_width
-
-    # Determine the conversion factors using the reference box
     reference_box = everything_results[0].boxes[reference_box_id].xyxy.cpu().numpy()[0]
 
-    # Create a mask for the reference object
     mask = np.zeros(frame.shape[:2], dtype=np.uint8)
     cv2.rectangle(mask, (int(reference_box[0]), int(reference_box[1])), (int(reference_box[2]), int(reference_box[3])), 255, -1)
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     rect = cv2.minAreaRect(contours[0])
-    box_points = cv2.boxPoints(rect)
-    box_points = np.intp(box_points)
     width_pixels = rect[1][0]
     height_pixels = rect[1][1]
 
@@ -99,6 +95,9 @@ async def process_image(
 
     # Redraw bounding boxes with dimensions
     for i, box in enumerate(everything_results[0].boxes):
+        if i == reference_box_id:
+            continue  # Skip the reference box
+        
         box = box.xyxy.cpu().numpy()[0]
         mask = np.zeros(frame.shape[:2], dtype=np.uint8)
         cv2.rectangle(mask, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), 255, -1)
@@ -113,19 +112,11 @@ async def process_image(
             height_pixels = rect[1][1]
             width_real_world = width_pixels * width_conversion_factor
             height_real_world = height_pixels * height_conversion_factor
-            cv2.putText(frame, f'W: {width_real_world:.2f} cm', (int(box[0]), int(box[1]) - 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            cv2.putText(frame, f'H: {height_real_world:.2f} cm', (int(box[0]), int(box[1]) - 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-
-    # Process the prompts
-    prompt_process = FastSAMPrompt(frame, everything_results, device=DEVICE)
-
-    ann = prompt_process.text_prompt(text='dogs')  # Text prompt
-
-    # Plot the result
-    img = prompt_process.plot_to_result(ann)
+            cv2.putText(frame, f'W: {height_real_world:.2f} cm', (int(box[0]), int(box[1]) - 210), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 3)
+            cv2.putText(frame, f'H: {width_real_world:.2f} cm', (int(box[0]), int(box[1]) - 130), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 3)
 
     # Encode the resulting image as JPEG binary data
-    retval, buffer = cv2.imencode('.jpg', img)
+    retval, buffer = cv2.imencode('.jpg', frame)
     image_jpg = buffer.tobytes()
     base64_image = base64.b64encode(image_jpg).decode('utf-8')
 
